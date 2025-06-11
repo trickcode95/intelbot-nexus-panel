@@ -3,11 +3,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { QrCode, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Connections = () => {
   const [connectionStatus, setConnectionStatus] = useState("conectado");
+  const [qrCodeLink, setQrCodeLink] = useState("");
+  const [showQrCode, setShowQrCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -29,6 +33,23 @@ const Connections = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerateQrCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!qrCodeLink.trim()) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um link válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowQrCode(true);
+    toast({
+      title: "QR Code gerado!",
+      description: "QR Code gerado abaixo!",
+    });
   };
 
   const handleConnect = async () => {
@@ -100,35 +121,61 @@ const Connections = () => {
       </Card>
 
       {connectionStatus === "desconectado" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5" />
-              Conectar Nova Instância
-            </CardTitle>
-            <CardDescription>
-              Escaneie o QR Code com seu WhatsApp para conectar
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 mb-4">
-                QR Code será exibido aqui
-              </p>
-              <p className="text-sm text-gray-500">
-                Abra o WhatsApp → Menu → Aparelhos Conectados → Conectar um aparelho
-              </p>
-            </div>
-            <Button 
-              onClick={handleConnect} 
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? "Conectando..." : "Gerar QR Code"}
-            </Button>
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Conectar via QR Code</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleGenerateQrCode} className="space-y-4">
+                <div>
+                  <Label htmlFor="qr_code_link">Link da Instância para gerar QR</Label>
+                  <Input
+                    id="qr_code_link"
+                    type="text"
+                    value={qrCodeLink}
+                    onChange={(e) => setQrCodeLink(e.target.value)}
+                    placeholder="Cole aqui o link da instância"
+                  />
+                </div>
+                <Button type="submit">Gerar QR Code</Button>
+              </form>
+              
+              {showQrCode && qrCodeLink && (
+                <div className="mt-6 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-2">QR Code para: {qrCodeLink}</p>
+                  <p className="text-sm text-gray-500">
+                    Escaneie este código no WhatsApp
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5" />
+                Escanear QR Code de Conexão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 mb-4">
+                  Escaneie um QR Code para conectar
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Abra o WhatsApp → Menu → Aparelhos Conectados → Conectar um aparelho
+                </p>
+                <Button onClick={handleConnect} disabled={loading}>
+                  {loading ? "Conectando..." : "Simular Conexão"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       <Card>
@@ -136,20 +183,20 @@ const Connections = () => {
           <CardTitle>Histórico de Conexões</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center py-2 border-b">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-3 border-b">
               <div>
-                <p className="font-medium">Instância Principal</p>
-                <p className="text-sm text-gray-500">+55 11 99999-9999</p>
+                <p className="font-medium">📱 Instância Principal</p>
+                <p className="text-sm text-gray-500">+55 11 91234-5678</p>
               </div>
-              <Badge variant="default">Ativo</Badge>
+              <Badge variant="default">🟢 Ativo</Badge>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
+            <div className="flex justify-between items-center py-3 border-b">
               <div>
-                <p className="font-medium">Instância Teste</p>
+                <p className="font-medium">🔌 Instância Teste</p>
                 <p className="text-sm text-gray-500">Desconectado há 2 dias</p>
               </div>
-              <Badge variant="secondary">Inativo</Badge>
+              <Badge variant="secondary">⚪ Inativo</Badge>
             </div>
           </div>
         </CardContent>

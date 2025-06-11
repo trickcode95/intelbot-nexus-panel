@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Key, Globe } from "lucide-react";
+import { Settings, Key, Globe, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Evolution = () => {
   const [evolutionUrl, setEvolutionUrl] = useState("");
   const [evolutionKey, setEvolutionKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [lastChecked, setLastChecked] = useState("");
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,7 +24,7 @@ const Evolution = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       toast({
         title: "Configurações salvas!",
-        description: "A integração com Evolution API foi configurada com sucesso.",
+        description: "Configurações salvas com sucesso!",
       });
     } catch (error) {
       toast({
@@ -32,6 +34,49 @@ const Evolution = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!evolutionUrl || !evolutionKey) {
+      toast({
+        title: "Erro",
+        description: "Por favor, preencha a URL e a chave da API primeiro.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTestLoading(true);
+
+    try {
+      // Simulação de teste de conexão
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Simula sucesso ou falha aleatoriamente para demonstração
+      const isSuccess = Math.random() > 0.3;
+      
+      if (isSuccess) {
+        toast({
+          title: "✅ Conexão bem-sucedida!",
+          description: "Conexão bem-sucedida com a Evolution API!",
+        });
+        setLastChecked(new Date().toLocaleString());
+      } else {
+        toast({
+          title: "❌ Erro na conexão",
+          description: "Erro ao conectar. Verifique a URL e chave.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Erro na conexão",
+        description: "Erro ao conectar. Verifique a URL e chave.",
+        variant: "destructive",
+      });
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -48,11 +93,10 @@ const Evolution = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Configurações da Evolution API
+            Configurar Integração com Evolution API
           </CardTitle>
           <CardDescription>
-            Insira sua URL e chave da API fornecidas pela Evolution.
-            Essas informações são necessárias para conectar seu bot.
+            Insira a URL e chave da sua instância. Essas informações são necessárias para testar a conexão.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -60,7 +104,7 @@ const Evolution = () => {
             <div>
               <Label htmlFor="evolution_url" className="flex items-center gap-2">
                 <Globe className="h-4 w-4" />
-                URL da Evolution
+                🌐 URL da Evolution
               </Label>
               <Input
                 id="evolution_url"
@@ -78,7 +122,7 @@ const Evolution = () => {
             <div>
               <Label htmlFor="evolution_key" className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
-                API Key da Evolution
+                🔑 API Key da Evolution
               </Label>
               <Input
                 id="evolution_key"
@@ -102,6 +146,24 @@ const Evolution = () => {
 
       <Card>
         <CardHeader>
+          <CardTitle>Testar Conexão</CardTitle>
+          <CardDescription>
+            Verifique se as credenciais e a URL estão funcionando corretamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={handleTestConnection} 
+            disabled={testLoading}
+            className="w-full"
+          >
+            {testLoading ? "Testando..." : "🔍 Testar Conexão com Evolution API"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Status da Conexão</CardTitle>
         </CardHeader>
         <CardContent>
@@ -114,17 +176,11 @@ const Evolution = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Última verificação:</span>
-              <span className="text-gray-500">Nunca</span>
+              <span className="text-gray-500">
+                {lastChecked || "Nenhuma verificação realizada ainda."}
+              </span>
             </div>
           </div>
-          
-          {evolutionUrl && evolutionKey && (
-            <div className="mt-4 pt-4 border-t">
-              <Button variant="outline">
-                Testar Conexão
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 
