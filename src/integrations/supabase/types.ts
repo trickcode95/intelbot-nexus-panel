@@ -16,6 +16,8 @@ export type Database = {
           evolution_key: string | null
           evolution_url: string | null
           id: string
+          last_checked: string | null
+          qr_code_link: string | null
           user_id: string | null
         }
         Insert: {
@@ -24,6 +26,8 @@ export type Database = {
           evolution_key?: string | null
           evolution_url?: string | null
           id?: string
+          last_checked?: string | null
+          qr_code_link?: string | null
           user_id?: string | null
         }
         Update: {
@@ -32,6 +36,8 @@ export type Database = {
           evolution_key?: string | null
           evolution_url?: string | null
           id?: string
+          last_checked?: string | null
+          qr_code_link?: string | null
           user_id?: string | null
         }
         Relationships: []

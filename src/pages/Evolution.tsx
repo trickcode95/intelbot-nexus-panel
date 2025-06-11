@@ -1,27 +1,109 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Key, Globe, CheckCircle, XCircle } from "lucide-react";
+import { Settings, Key, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Evolution = () => {
-  const [evolutionUrl, setEvolutionUrl] = useState("");
-  const [evolutionKey, setEvolutionKey] = useState("");
+  const [userSettings, setUserSettings] = useState({
+    evolution_url: "",
+    evolution_key: "",
+    last_checked: null as string | null,
+  });
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
-  const [lastChecked, setLastChecked] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Get current user
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        loadUserSettings(user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  const loadUserSettings = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading user settings:', error);
+        return;
+      }
+
+      if (data) {
+        setUserSettings({
+          evolution_url: data.evolution_url || "",
+          evolution_key: data.evolution_key || "",
+          last_checked: data.last_checked,
+        });
+      } else {
+        // Create default settings if none exist
+        const { error: insertError } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: userId,
+            evolution_url: '',
+            evolution_key: '',
+          });
+
+        if (insertError) {
+          console.error('Error creating user settings:', insertError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in loadUserSettings:', error);
+    }
+  };
+
+  const updateUserSettings = async (updates: Partial<typeof userSettings>) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .update(updates)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error updating user settings:', error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Erro ao salvar as configurações.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setUserSettings(prev => ({ ...prev, ...updates }));
+    } catch (error) {
+      console.error('Error in updateUserSettings:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Simulação de salvamento - em produção, usar Supabase
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateUserSettings({
+        evolution_url: userSettings.evolution_url,
+        evolution_key: userSettings.evolution_key,
+      });
+      
       toast({
         title: "Configurações salvas!",
         description: "Configurações salvas com sucesso!",
@@ -38,7 +120,7 @@ const Evolution = () => {
   };
 
   const handleTestConnection = async () => {
-    if (!evolutionUrl || !evolutionKey) {
+    if (!userSettings.evolution_url || !userSettings.evolution_key) {
       toast({
         title: "Erro",
         description: "Por favor, preencha a URL e a chave da API primeiro.",
@@ -57,11 +139,13 @@ const Evolution = () => {
       const isSuccess = Math.random() > 0.3;
       
       if (isSuccess) {
+        const now = new Date().toISOString();
+        await updateUserSettings({ last_checked: now });
+        
         toast({
           title: "✅ Conexão bem-sucedida!",
           description: "Conexão bem-sucedida com a Evolution API!",
         });
-        setLastChecked(new Date().toLocaleString());
       } else {
         toast({
           title: "❌ Erro na conexão",
@@ -109,8 +193,8 @@ const Evolution = () => {
               <Input
                 id="evolution_url"
                 type="text"
-                value={evolutionUrl}
-                onChange={(e) => setEvolutionUrl(e.target.value)}
+                value={userSettings.evolution_url}
+                onChange={(e) => setUserSettings(prev => ({ ...prev, evolution_url: e.target.value }))}
                 placeholder="https://api.evolution.com/instancia"
                 required
               />
@@ -127,8 +211,8 @@ const Evolution = () => {
               <Input
                 id="evolution_key"
                 type="password"
-                value={evolutionKey}
-                onChange={(e) => setEvolutionKey(e.target.value)}
+                value={userSettings.evolution_key}
+                onChange={(e) => setUserSettings(prev => ({ ...prev, evolution_key: e.target.value }))}
                 placeholder="sk-xxxx"
                 required
               />
@@ -171,13 +255,16 @@ const Evolution = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Status da API:</span>
               <span className="text-orange-600 font-medium">
-                {evolutionUrl && evolutionKey ? "Configurado" : "Não configurado"}
+                {userSettings.evolution_url && userSettings.evolution_key ? "Configurado" : "Não configurado"}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Última verificação:</span>
               <span className="text-gray-500">
-                {lastChecked || "Nenhuma verificação realizada ainda."}
+                {userSettings.last_checked 
+                  ? new Date(userSettings.last_checked).toLocaleString() 
+                  : "Nenhuma verificação realizada ainda."
+                }
               </span>
             </div>
           </div>

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,19 +7,95 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QrCode, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Connections = () => {
-  const [connectionStatus, setConnectionStatus] = useState("conectado");
+  const [userSettings, setUserSettings] = useState({
+    connection_status: "desconectado",
+    qr_code_link: "",
+  });
   const [qrCodeLink, setQrCodeLink] = useState("");
-  const [showQrCode, setShowQrCode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Get current user
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        loadUserSettings(user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  const loadUserSettings = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading user settings:', error);
+        return;
+      }
+
+      if (data) {
+        setUserSettings(data);
+        setQrCodeLink(data.qr_code_link || "");
+      } else {
+        // Create default settings if none exist
+        const { error: insertError } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: userId,
+            connection_status: 'desconectado',
+            qr_code_link: '',
+          });
+
+        if (insertError) {
+          console.error('Error creating user settings:', insertError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in loadUserSettings:', error);
+    }
+  };
+
+  const updateUserSettings = async (updates: Partial<typeof userSettings>) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .update(updates)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error updating user settings:', error);
+        toast({
+          title: "Erro ao salvar",
+          description: "Erro ao salvar as configurações.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setUserSettings(prev => ({ ...prev, ...updates }));
+    } catch (error) {
+      console.error('Error in updateUserSettings:', error);
+    }
+  };
 
   const handleDisconnect = async () => {
     setLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setConnectionStatus("desconectado");
+      await updateUserSettings({ connection_status: "desconectado" });
       toast({
         title: "Instância desconectada",
         description: "A conexão foi encerrada com sucesso.",
@@ -45,10 +121,11 @@ const Connections = () => {
       });
       return;
     }
-    setShowQrCode(true);
+
+    await updateUserSettings({ qr_code_link: qrCodeLink });
     toast({
       title: "QR Code gerado!",
-      description: "QR Code gerado abaixo!",
+      description: "QR Code gerado e salvo com sucesso!",
     });
   };
 
@@ -56,7 +133,7 @@ const Connections = () => {
     setLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      setConnectionStatus("conectado");
+      await updateUserSettings({ connection_status: "conectado" });
       toast({
         title: "Instância conectada",
         description: "Conexão estabelecida com sucesso!",
@@ -84,7 +161,7 @@ const Connections = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {connectionStatus === "conectado" ? (
+            {userSettings.connection_status === "conectado" ? (
               <Wifi className="h-5 w-5 text-green-600" />
             ) : (
               <WifiOff className="h-5 w-5 text-red-600" />
@@ -99,13 +176,13 @@ const Connections = () => {
           <div className="flex items-center justify-between">
             <span className="text-gray-600">Estado atual:</span>
             <Badge 
-              variant={connectionStatus === "conectado" ? "default" : "destructive"}
+              variant={userSettings.connection_status === "conectado" ? "default" : "destructive"}
             >
-              {connectionStatus === "conectado" ? "Conectado" : "Desconectado"}
+              {userSettings.connection_status === "conectado" ? "Conectado" : "Desconectado"}
             </Badge>
           </div>
           
-          {connectionStatus === "conectado" && (
+          {userSettings.connection_status === "conectado" && (
             <div className="pt-4 border-t">
               <Button 
                 variant="outline" 
@@ -120,38 +197,48 @@ const Connections = () => {
         </CardContent>
       </Card>
 
-      {connectionStatus === "desconectado" && (
+      {userSettings.connection_status === "desconectado" && (
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Conectar via QR Code</CardTitle>
+              <CardTitle>Gerar QR Code da Instância</CardTitle>
+              <CardDescription>
+                Insira o link da sua instância para gerar o QR Code
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleGenerateQrCode} className="space-y-4">
                 <div>
-                  <Label htmlFor="qr_code_link">Link da Instância para gerar QR</Label>
+                  <Label htmlFor="qr_code_link">Link da instância (para gerar QR Code)</Label>
                   <Input
                     id="qr_code_link"
                     type="text"
                     value={qrCodeLink}
                     onChange={(e) => setQrCodeLink(e.target.value)}
-                    placeholder="Cole aqui o link da instância"
+                    placeholder="https://minha.instancia.com"
                   />
                 </div>
-                <Button type="submit">Gerar QR Code</Button>
+                <Button type="submit">Salvar e Mostrar QR</Button>
               </form>
-              
-              {showQrCode && qrCodeLink && (
-                <div className="mt-6 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+            </CardContent>
+          </Card>
+
+          {userSettings.qr_code_link && (
+            <Card>
+              <CardHeader>
+                <CardTitle>QR Code Gerado</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                   <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-2">QR Code para: {qrCodeLink}</p>
+                  <p className="text-gray-600 mb-2">QR Code para: {userSettings.qr_code_link}</p>
                   <p className="text-sm text-gray-500">
                     Escaneie este código no WhatsApp
                   </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
