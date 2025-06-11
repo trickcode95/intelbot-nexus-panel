@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,14 +93,18 @@ const Dashboard = () => {
             <CardTitle>Ações Rápidas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button variant="outline" className="w-full justify-start">
-              Ver Conexões
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/connections">
+                🔌 Ver Conexões
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Configurar Evolution API
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link to="/evolution">
+                ⚙️ Configurar Evolution API
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Histórico de Conversas
+            <Button variant="outline" className="w-full justify-start" disabled>
+              📜 Histórico de Conversas (em breve)
             </Button>
           </CardContent>
         </Card>
