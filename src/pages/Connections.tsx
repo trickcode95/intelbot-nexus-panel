@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,7 @@ const Connections = () => {
     qr_code_link: "",
   });
   const [qrCodeLink, setQrCodeLink] = useState("");
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -111,6 +111,49 @@ const Connections = () => {
     }
   };
 
+  // Função utilitária para extrair o ID da instância da URL
+  function extractInstanceId(url: string): string | null {
+    try {
+      const parts = url.split("/").filter(Boolean);
+      return parts[parts.length - 1] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  const fetchQrCode = async (instanceUrl: string) => {
+    try {
+      setLoading(true);
+      const instanceId = extractInstanceId(instanceUrl);
+      if (!instanceId) throw new Error('ID da instância não encontrado na URL');
+      // Monta a URL do endpoint
+      const baseUrl = instanceUrl.replace(/\/[^/]*$/, '');
+      const url = `${baseUrl}/instance/${instanceId}/qrcode`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Erro ao buscar QR Code');
+      const data = await response.json();
+      if (data.status === 'success' && data.qrcode) {
+        setQrCodeUrl(data.qrcode);
+      } else {
+        setQrCodeUrl(null);
+        toast({
+          title: "Erro ao buscar QR Code",
+          description: "A API não retornou um QR Code válido.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      setQrCodeUrl(null);
+      toast({
+        title: "Erro ao buscar QR Code",
+        description: "Verifique a URL da instância e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerateQrCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!qrCodeLink.trim()) {
@@ -121,13 +164,20 @@ const Connections = () => {
       });
       return;
     }
-
     await updateUserSettings({ qr_code_link: qrCodeLink });
     toast({
-      title: "QR Code gerado!",
-      description: "QR Code gerado e salvo com sucesso!",
+      title: "URL salva!",
+      description: "Buscando QR Code...",
     });
+    fetchQrCode(qrCodeLink);
   };
+
+  useEffect(() => {
+    if (userSettings.qr_code_link) {
+      fetchQrCode(userSettings.qr_code_link);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userSettings.qr_code_link]);
 
   const handleConnect = async () => {
     setLoading(true);
@@ -150,45 +200,56 @@ const Connections = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gray-900 min-h-screen p-4 text-white">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Conexões</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold">Conexões</h1>
+        <p className="text-gray-300 mt-2">
           Gerencie suas instâncias e conexões WhatsApp
         </p>
       </div>
 
-      <Card>
+      <Card className="bg-gray-800">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {userSettings.connection_status === "conectado" ? (
-              <Wifi className="h-5 w-5 text-green-600" />
+              <Wifi className="h-5 w-5 text-green-400" />
             ) : (
-              <WifiOff className="h-5 w-5 text-red-600" />
+              <WifiOff className="h-5 w-5 text-red-400" />
             )}
             Status da Instância
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-400">
             Estado atual da sua conexão com o WhatsApp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-600">Estado atual:</span>
-            <Badge 
-              variant={userSettings.connection_status === "conectado" ? "default" : "destructive"}
-            >
-              {userSettings.connection_status === "conectado" ? "Conectado" : "Desconectado"}
-            </Badge>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-300">Estado atual:</span>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant={userSettings.connection_status === "conectado" ? "default" : "destructive"}
+              >
+                {userSettings.connection_status === "conectado" ? "Conectado" : "Desconectado"}
+              </Badge>
+              {userSettings.connection_status === "desconectado" && (
+                <Button 
+                  onClick={handleConnect} 
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition-all duration-200 px-4 py-1 text-sm"
+                >
+                  {loading ? "Conectando..." : "Conectar"}
+                </Button>
+              )}
+            </div>
           </div>
           
           {userSettings.connection_status === "conectado" && (
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t border-gray-700">
               <Button 
                 variant="outline" 
                 onClick={handleDisconnect}
                 disabled={loading}
-                className="text-red-600 border-red-200 hover:bg-red-50"
+                className="text-red-400 border-red-400 hover:bg-red-900"
               >
                 {loading ? "Desconectando..." : "Desconectar Instância"}
               </Button>
@@ -197,73 +258,38 @@ const Connections = () => {
         </CardContent>
       </Card>
 
-      {userSettings.connection_status === "desconectado" && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerar QR Code da Instância</CardTitle>
-              <CardDescription>
-                Insira o link da sua instância para gerar o QR Code
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleGenerateQrCode} className="space-y-4">
-                <div>
-                  <Label htmlFor="qr_code_link">Link da instância (para gerar QR Code)</Label>
-                  <Input
-                    id="qr_code_link"
-                    type="text"
-                    value={qrCodeLink}
-                    onChange={(e) => setQrCodeLink(e.target.value)}
-                    placeholder="https://minha.instancia.com"
-                  />
-                </div>
-                <Button type="submit">Salvar e Mostrar QR</Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {userSettings.qr_code_link && (
-            <Card>
-              <CardHeader>
-                <CardTitle>QR Code Gerado</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600 mb-2">QR Code para: {userSettings.qr_code_link}</p>
-                  <p className="text-sm text-gray-500">
-                    Escaneie este código no WhatsApp
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+      <Card className="bg-gray-800">
+        <CardHeader>
+          <CardTitle>Gerar QR Code da Instância</CardTitle>
+          <CardDescription className="text-gray-400">
+            Insira o link da sua instância para gerar o QR Code
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleGenerateQrCode} className="space-y-4">
+            <div>
+              <Label htmlFor="qr_code_link" className="text-gray-200">Link da instância (para gerar QR Code)</Label>
+              <Input
+                id="qr_code_link"
+                type="text"
+                value={qrCodeLink}
+                onChange={(e) => setQrCodeLink(e.target.value)}
+                placeholder="https://minha.instancia.com"
+                className="bg-gray-900 text-white border-gray-700"
+              />
+            </div>
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white w-full font-semibold rounded-lg shadow transition-all duration-200">
+              {loading ? "Buscando QR..." : "Salvar e Mostrar QR"}
+            </Button>
+          </form>
+          {qrCodeUrl && (
+            <div className="flex flex-col items-center mt-8">
+              <img src={qrCodeUrl} alt="QR Code de Conexão" className="w-48 h-48 rounded-lg border-2 border-gray-700 shadow-lg" />
+              <p className="text-gray-300 mt-2">Escaneie este QR Code no WhatsApp</p>
+            </div>
           )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5" />
-                Escanear QR Code de Conexão
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600 mb-4">
-                  Escaneie um QR Code para conectar
-                </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Abra o WhatsApp → Menu → Aparelhos Conectados → Conectar um aparelho
-                </p>
-                <Button onClick={handleConnect} disabled={loading}>
-                  {loading ? "Conectando..." : "Simular Conexão"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ const Login = () => {
           <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
             <Bot className="h-6 w-6 text-blue-600" />
           </div>
-          <CardTitle className="text-2xl">Entrar no Painel Tech</CardTitle>
+          <CardTitle className="text-2xl text-blue-700 tracking-tight">Entrar no Painel Tech</CardTitle>
           <CardDescription>
             Entre com sua conta para acessar o dashboard
           </CardDescription>
@@ -74,7 +73,11 @@ const Login = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg transition-all duration-200 font-semibold tracking-wide text-base py-2"
+              disabled={loading}
+            >
               {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
